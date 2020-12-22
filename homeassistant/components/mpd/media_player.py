@@ -129,7 +129,7 @@ class MpdDevice(MediaPlayerEntity):
         """Disconnect from MPD."""
         try:
             await self._client.disconnect()
-        except mpd.ConnectionError:
+        except (mpd.ConnectionError, TypeError):
             pass
         self._is_connected = False
         self._status = None
