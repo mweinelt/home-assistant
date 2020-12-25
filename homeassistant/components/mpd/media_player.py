@@ -83,8 +83,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     name = config.get(CONF_NAME)
     password = config.get(CONF_PASSWORD)
 
-    device = MpdDevice(host, port, password, name)
-    async_add_entities([device], True)
+    entity = MpdDevice(host, port, password, name)
+    async_add_entities([entity], True)
 
 
 class MpdDevice(MediaPlayerEntity):
@@ -125,11 +125,11 @@ class MpdDevice(MediaPlayerEntity):
 
         self._is_connected = True
 
-    async def _disconnect(self):
+    def _disconnect(self):
         """Disconnect from MPD."""
         try:
-            await self._client.disconnect()
-        except (mpd.ConnectionError, TypeError):
+            self._client.disconnect()
+        except mpd.ConnectionError:
             pass
         self._is_connected = False
         self._status = None
@@ -168,7 +168,7 @@ class MpdDevice(MediaPlayerEntity):
         except (mpd.ConnectionError, OSError, BrokenPipeError, ValueError) as error:
             # Cleanly disconnect in case connection is not in valid state
             _LOGGER.debug("Error updating status: %s", error)
-            await self._disconnect()
+            self._disconnect()
 
     @property
     def name(self):
