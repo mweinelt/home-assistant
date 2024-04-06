@@ -1,4 +1,4 @@
-"""Support for the SpaceAPI."""
+"""Support for the SpaceAPI: https://spaceapi.io/docs/"""
 
 from contextlib import suppress
 
@@ -23,23 +23,21 @@ from homeassistant.const import (
 import homeassistant.core as ha
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.template import area_name as get_area_name
 from homeassistant.helpers.typing import ConfigType
 import homeassistant.util.dt as dt_util
 
+ATTR_API_COMPATIBILITY = "api_compatibility"
 ATTR_ADDRESS = "address"
 ATTR_SPACEFED = "spacefed"
 ATTR_CAM = "cam"
-ATTR_STREAM = "stream"
 ATTR_FEEDS = "feeds"
-ATTR_CACHE = "cache"
 ATTR_PROJECTS = "projects"
-ATTR_RADIO_SHOW = "radio_show"
 ATTR_LAT = "lat"
 ATTR_LON = "lon"
-ATTR_API = "api"
+ATTR_TIMEZONE = "timezone"
 ATTR_CLOSED = "closed"
 ATTR_CONTACT = "contact"
-ATTR_ISSUE_REPORT_CHANNELS = "issue_report_channels"
 ATTR_LASTCHANGE = "lastchange"
 ATTR_LOGO = "logo"
 ATTR_OPEN = "open"
@@ -51,21 +49,17 @@ ATTR_VALUE = "value"
 ATTR_SENSOR_LOCATION = "location"
 
 CONF_CONTACT = "contact"
+CONF_EXTENSIONS = "extensions"
 CONF_HUMIDITY = "humidity"
 CONF_ICON_CLOSED = "icon_closed"
 CONF_ICON_OPEN = "icon_open"
 CONF_ICONS = "icons"
 CONF_IRC = "irc"
-CONF_ISSUE_REPORT_CHANNELS = "issue_report_channels"
 CONF_SPACEFED = "spacefed"
 CONF_SPACENET = "spacenet"
 CONF_SPACESAML = "spacesaml"
 CONF_SPACEPHONE = "spacephone"
 CONF_CAM = "cam"
-CONF_STREAM = "stream"
-CONF_M4 = "m4"
-CONF_MJPEG = "mjpeg"
-CONF_USTREAM = "ustream"
 CONF_FEEDS = "feeds"
 CONF_FEED_BLOG = "blog"
 CONF_FEED_WIKI = "wiki"
@@ -76,12 +70,6 @@ CONF_FEED_URL = "url"
 CONF_CACHE = "cache"
 CONF_CACHE_SCHEDULE = "schedule"
 CONF_PROJECTS = "projects"
-CONF_RADIO_SHOW = "radio_show"
-CONF_RADIO_SHOW_NAME = "name"
-CONF_RADIO_SHOW_URL = "url"
-CONF_RADIO_SHOW_TYPE = "type"
-CONF_RADIO_SHOW_START = "start"
-CONF_RADIO_SHOW_END = "end"
 CONF_LOGO = "logo"
 CONF_PHONE = "phone"
 CONF_SIP = "sip"
@@ -91,41 +79,41 @@ CONF_KEYMASTER_IRC_NICK = "irc_nick"
 CONF_KEYMASTER_PHONE = "phone"
 CONF_KEYMASTER_EMAIL = "email"
 CONF_KEYMASTER_TWITTER = "twitter"
+CONF_KEYMASTER_XMPP = "xmpp"
+CONF_KEYMASTER_MASTODON = "mastodon"
+CONF_KEYMASTER_MATRIX = "matrix"
 CONF_TWITTER = "twitter"
 CONF_FACEBOOK = "facebook"
 CONF_IDENTICA = "identica"
 CONF_FOURSQUARE = "foursquare"
 CONF_ML = "ml"
-CONF_JABBER = "jabber"
+CONF_MASTODON = "mastodon"
+CONF_GOPHER = "gopher"
+CONF_MATRIX = "matrix"
+CONF_MUMBLE = "mumble"
+CONF_XMPP = "xmpp"
 CONF_ISSUE_MAIL = "issue_mail"
 CONF_SPACE = "space"
 CONF_TEMPERATURE = "temperature"
+CONF_TIMEZONE = "timezone"
 
 DATA_SPACEAPI = "data_spaceapi"
 DOMAIN = "spaceapi"
 
-ISSUE_REPORT_CHANNELS = [CONF_EMAIL, CONF_ISSUE_MAIL, CONF_ML, CONF_TWITTER]
-
 SENSOR_TYPES = [CONF_HUMIDITY, CONF_TEMPERATURE]
-SPACEAPI_VERSION = "0.13"
+SPACEAPI_VERSION = "14"
 
 URL_API_SPACEAPI = "/api/spaceapi"
 
-LOCATION_SCHEMA = vol.Schema({vol.Optional(CONF_ADDRESS): cv.string})
+LOCATION_SCHEMA = vol.Schema(
+    {vol.Optional(CONF_ADDRESS): cv.string, vol.Optional(CONF_TIMEZONE): cv.string}
+)
 
 SPACEFED_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_SPACENET): cv.boolean,
         vol.Optional(CONF_SPACESAML): cv.boolean,
         vol.Optional(CONF_SPACEPHONE): cv.boolean,
-    }
-)
-
-STREAM_SCHEMA = vol.Schema(
-    {
-        vol.Optional(CONF_M4): cv.url,
-        vol.Optional(CONF_MJPEG): cv.url,
-        vol.Optional(CONF_USTREAM): cv.url,
     }
 )
 
@@ -142,24 +130,6 @@ FEEDS_SCHEMA = vol.Schema(
     }
 )
 
-CACHE_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_CACHE_SCHEDULE): cv.matches_regex(
-            r"(m.02|m.05|m.10|m.15|m.30|h.01|h.02|h.04|h.08|h.12|d.01)"
-        )
-    }
-)
-
-RADIO_SHOW_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_RADIO_SHOW_NAME): cv.string,
-        vol.Required(CONF_RADIO_SHOW_URL): cv.url,
-        vol.Required(CONF_RADIO_SHOW_TYPE): cv.matches_regex(r"(mp3|ogg)"),
-        vol.Required(CONF_RADIO_SHOW_START): cv.string,
-        vol.Required(CONF_RADIO_SHOW_END): cv.string,
-    }
-)
-
 KEYMASTER_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_KEYMASTER_NAME): cv.string,
@@ -167,22 +137,29 @@ KEYMASTER_SCHEMA = vol.Schema(
         vol.Optional(CONF_KEYMASTER_PHONE): cv.string,
         vol.Optional(CONF_KEYMASTER_EMAIL): cv.string,
         vol.Optional(CONF_KEYMASTER_TWITTER): cv.string,
+        vol.Optional(CONF_KEYMASTER_XMPP): cv.string,
+        vol.Optional(CONF_KEYMASTER_MASTODON): cv.string,
+        vol.Optional(CONF_KEYMASTER_MATRIX): cv.string,
     }
 )
 
 CONTACT_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_EMAIL): cv.string,
-        vol.Optional(CONF_IRC): cv.string,
-        vol.Optional(CONF_ML): cv.string,
-        vol.Optional(CONF_PHONE): cv.string,
-        vol.Optional(CONF_TWITTER): cv.string,
-        vol.Optional(CONF_SIP): cv.string,
         vol.Optional(CONF_FACEBOOK): cv.string,
-        vol.Optional(CONF_IDENTICA): cv.string,
         vol.Optional(CONF_FOURSQUARE): cv.string,
-        vol.Optional(CONF_JABBER): cv.string,
+        vol.Optional(CONF_GOPHER): cv.string,
+        vol.Optional(CONF_IDENTICA): cv.string,
+        vol.Optional(CONF_IRC): cv.string,
         vol.Optional(CONF_ISSUE_MAIL): cv.string,
+        vol.Optional(CONF_MASTODON): cv.string,
+        vol.Optional(CONF_MATRIX): cv.string,
+        vol.Optional(CONF_ML): cv.string,
+        vol.Optional(CONF_MUMBLE): cv.string,
+        vol.Optional(CONF_PHONE): cv.string,
+        vol.Optional(CONF_SIP): cv.string,
+        vol.Optional(CONF_TWITTER): cv.string,
+        vol.Optional(CONF_XMPP): cv.string,
         vol.Optional(CONF_KEYMASTERS): vol.All(
             cv.ensure_list, [KEYMASTER_SCHEMA], vol.Length(min=1)
         ),
@@ -208,9 +185,6 @@ CONFIG_SCHEMA = vol.Schema(
         DOMAIN: vol.Schema(
             {
                 vol.Required(CONF_CONTACT): CONTACT_SCHEMA,
-                vol.Required(CONF_ISSUE_REPORT_CHANNELS): vol.All(
-                    cv.ensure_list, [vol.In(ISSUE_REPORT_CHANNELS)]
-                ),
                 vol.Optional(CONF_LOCATION): LOCATION_SCHEMA,
                 vol.Required(CONF_LOGO): cv.url,
                 vol.Required(CONF_SPACE): cv.string,
@@ -221,13 +195,9 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_CAM): vol.All(
                     cv.ensure_list, [cv.url], vol.Length(min=1)
                 ),
-                vol.Optional(CONF_STREAM): STREAM_SCHEMA,
                 vol.Optional(CONF_FEEDS): FEEDS_SCHEMA,
-                vol.Optional(CONF_CACHE): CACHE_SCHEMA,
                 vol.Optional(CONF_PROJECTS): vol.All(cv.ensure_list, [cv.url]),
-                vol.Optional(CONF_RADIO_SHOW): vol.All(
-                    cv.ensure_list, [RADIO_SHOW_SCHEMA]
-                ),
+                vol.Optional(CONF_EXTENSIONS): dict,
             }
         )
     },
@@ -254,11 +224,19 @@ class APISpaceApiView(HomeAssistantView):
         """Get data from a sensor."""
         if not (sensor_state := hass.states.get(sensor)):
             return None
-        sensor_data = {ATTR_NAME: sensor_state.name, ATTR_VALUE: sensor_state.state}
+        try:
+            sensor_data = {ATTR_NAME: sensor_state.name, ATTR_VALUE: float(sensor_state.state)}
+        except ValueError as ex:
+            # casting to float likely didn't pan out
+            return None
+
         if ATTR_SENSOR_LOCATION in sensor_state.attributes:
             sensor_data[ATTR_LOCATION] = sensor_state.attributes[ATTR_SENSOR_LOCATION]
+        elif area_name := get_area_name(hass, sensor_state.entity_id):
+            sensor_data[ATTR_LOCATION] = area_name
         else:
             sensor_data[ATTR_LOCATION] = spaceapi[CONF_SPACE]
+
         # Some sensors don't have a unit of measurement
         if ATTR_UNIT_OF_MEASUREMENT in sensor_state.attributes:
             sensor_data[ATTR_UNIT] = sensor_state.attributes[ATTR_UNIT_OF_MEASUREMENT]
@@ -275,6 +253,7 @@ class APISpaceApiView(HomeAssistantView):
 
         try:
             location[ATTR_ADDRESS] = spaceapi[ATTR_LOCATION][CONF_ADDRESS]
+            location[ATTR_TIMEZONE] = spaceapi[ATTR_LOCATION][CONF_TIMEZONE]
         except KeyError:
             pass
         except TypeError:
@@ -284,7 +263,7 @@ class APISpaceApiView(HomeAssistantView):
 
         if (space_state := hass.states.get(state_entity)) is not None:
             state = {
-                ATTR_OPEN: space_state.state != "off",
+                ATTR_OPEN: space_state.state not in ["off", "False"],
                 ATTR_LASTCHANGE: dt_util.as_timestamp(space_state.last_updated),
             }
         else:
@@ -297,9 +276,8 @@ class APISpaceApiView(HomeAssistantView):
             }
 
         data = {
-            ATTR_API: SPACEAPI_VERSION,
+            ATTR_API_COMPATIBILITY: [SPACEAPI_VERSION],
             ATTR_CONTACT: spaceapi[CONF_CONTACT],
-            ATTR_ISSUE_REPORT_CHANNELS: spaceapi[CONF_ISSUE_REPORT_CHANNELS],
             ATTR_LOCATION: location,
             ATTR_LOGO: spaceapi[CONF_LOGO],
             ATTR_SPACE: spaceapi[CONF_SPACE],
@@ -314,19 +292,10 @@ class APISpaceApiView(HomeAssistantView):
             data[ATTR_SPACEFED] = spaceapi[CONF_SPACEFED]
 
         with suppress(KeyError):
-            data[ATTR_STREAM] = spaceapi[CONF_STREAM]
-
-        with suppress(KeyError):
             data[ATTR_FEEDS] = spaceapi[CONF_FEEDS]
 
         with suppress(KeyError):
-            data[ATTR_CACHE] = spaceapi[CONF_CACHE]
-
-        with suppress(KeyError):
             data[ATTR_PROJECTS] = spaceapi[CONF_PROJECTS]
-
-        with suppress(KeyError):
-            data[ATTR_RADIO_SHOW] = spaceapi[CONF_RADIO_SHOW]
 
         if is_sensors is not None:
             sensors = {}
@@ -336,5 +305,8 @@ class APISpaceApiView(HomeAssistantView):
                     sensor_data = self.get_sensor_data(hass, spaceapi, sensor)
                     sensors[sensor_type].append(sensor_data)
             data[ATTR_SENSORS] = sensors
+
+        with suppress(KeyError):
+            data.update(spaceapi[CONF_EXTENSIONS])
 
         return self.json(data)
